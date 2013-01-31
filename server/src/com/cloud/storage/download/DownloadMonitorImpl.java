@@ -40,14 +40,14 @@ import com.cloud.agent.api.Command;
 import com.cloud.agent.api.storage.DeleteTemplateCommand;
 import com.cloud.agent.api.storage.DeleteVolumeCommand;
 import com.cloud.agent.api.storage.DownloadCommand;
-import com.cloud.agent.api.storage.ListVolumeAnswer;
-import com.cloud.agent.api.storage.ListVolumeCommand;
 import com.cloud.agent.api.storage.DownloadCommand.Proxy;
 import com.cloud.agent.api.storage.DownloadCommand.ResourceType;
 import com.cloud.agent.api.storage.DownloadProgressCommand;
 import com.cloud.agent.api.storage.DownloadProgressCommand.RequestType;
 import com.cloud.agent.api.storage.ListTemplateAnswer;
 import com.cloud.agent.api.storage.ListTemplateCommand;
+import com.cloud.agent.api.storage.ListVolumeAnswer;
+import com.cloud.agent.api.storage.ListVolumeCommand;
 import com.cloud.agent.manager.Commands;
 import com.cloud.alert.AlertManager;
 import com.cloud.configuration.Config;
@@ -71,13 +71,11 @@ import com.cloud.storage.StorageManager;
 import com.cloud.storage.SwiftVO;
 import com.cloud.storage.VMTemplateHostVO;
 import com.cloud.storage.VMTemplateStorageResourceAssoc;
-import com.cloud.storage.Volume;
+import com.cloud.storage.VMTemplateVO;
+import com.cloud.storage.VMTemplateStorageResourceAssoc.Status;
+import com.cloud.storage.VMTemplateZoneVO;
 import com.cloud.storage.VolumeHostVO;
 import com.cloud.storage.VolumeVO;
-import com.cloud.storage.VMTemplateStorageResourceAssoc.Status;
-import com.cloud.storage.Volume.Event;
-import com.cloud.storage.VMTemplateVO;
-import com.cloud.storage.VMTemplateZoneVO;
 import com.cloud.storage.dao.StoragePoolHostDao;
 import com.cloud.storage.dao.SwiftDao;
 import com.cloud.storage.dao.VMTemplateDao;
@@ -91,6 +89,7 @@ import com.cloud.storage.secondary.SecondaryStorageVmManager;
 import com.cloud.storage.swift.SwiftManager;
 import com.cloud.storage.template.TemplateConstants;
 import com.cloud.storage.template.TemplateInfo;
+import com.cloud.template.TemplateManager;
 import com.cloud.user.Account;
 import com.cloud.user.ResourceLimitService;
 import com.cloud.utils.component.ManagerBase;
@@ -100,12 +99,12 @@ import com.cloud.utils.db.SearchBuilder;
 import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.Transaction;
 import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.utils.fsm.NoTransitionException;
 import com.cloud.vm.SecondaryStorageVm;
 import com.cloud.vm.SecondaryStorageVmVO;
 import com.cloud.vm.UserVmManager;
 import com.cloud.vm.VirtualMachine.State;
 import com.cloud.vm.dao.SecondaryStorageVmDao;
+
 import edu.emory.mathcs.backport.java.util.Collections;
 
 
@@ -150,6 +149,7 @@ public class DownloadMonitorImpl extends ManagerBase implements  DownloadMonitor
     ConfigurationDao _configDao;
     @Inject
     UserVmManager _vmMgr;
+    @Inject TemplateManager templateMgr;
 
     
     @Inject 
@@ -264,7 +264,7 @@ public class DownloadMonitorImpl extends ManagerBase implements  DownloadMonitor
         
 		if(destTmpltHost != null) {
 		    start();
-            String sourceChecksum = _vmMgr.getChecksum(srcTmpltHost.getHostId(), srcTmpltHost.getInstallPath());
+            String sourceChecksum = this.templateMgr.getChecksum(srcTmpltHost.getHostId(), srcTmpltHost.getInstallPath());
 			DownloadCommand dcmd =  
               new DownloadCommand(destServer.getStorageUrl(), url, template, TemplateConstants.DEFAULT_HTTP_AUTH_USER, _copyAuthPasswd, maxTemplateSizeInBytes); 
 			dcmd.setProxy(getHttpProxy());
@@ -504,6 +504,8 @@ public class DownloadMonitorImpl extends ManagerBase implements  DownloadMonitor
             long size = -1;
             if(vmTemplateHost!=null){
                 size = vmTemplateHost.getPhysicalSize();
+                template.setSize(size);
+                this._templateDao.update(template.getId(), template);
             }
             else{
                 s_logger.warn("Failed to get size for template" + template.getName());
@@ -540,6 +542,8 @@ public class DownloadMonitorImpl extends ManagerBase implements  DownloadMonitor
             long size = -1;
             if(volumeHost!=null){
                 size = volumeHost.getPhysicalSize();
+                volume.setSize(size);
+                this._volumeDao.update(volume.getId(), volume);
             }
             else{
                 s_logger.warn("Failed to get size for volume" + volume.getName());
@@ -955,7 +959,7 @@ public class DownloadMonitorImpl extends ManagerBase implements  DownloadMonitor
         s_logger.debug("Found " +templateHostRefList.size()+ " templates with no checksum. Will ask for computation");
         for(VMTemplateHostVO templateHostRef : templateHostRefList){
             s_logger.debug("Getting checksum for template - " + templateHostRef.getTemplateId());
-            String checksum = _vmMgr.getChecksum(hostId, templateHostRef.getInstallPath());
+            String checksum = this.templateMgr.getChecksum(hostId, templateHostRef.getInstallPath());
             VMTemplateVO template = _templateDao.findById(templateHostRef.getTemplateId());
             s_logger.debug("Setting checksum " +checksum+ " for template - " + template.getName());
             template.setChecksum(checksum);

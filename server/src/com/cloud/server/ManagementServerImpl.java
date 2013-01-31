@@ -48,7 +48,6 @@ import javax.management.MalformedObjectNameException;
 import javax.management.NotCompliantMBeanException;
 import javax.naming.ConfigurationException;
 
-import com.cloud.storage.dao.*;
 import org.apache.cloudstack.acl.SecurityChecker.AccessType;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.BaseUpdateTemplateOrIsoCmd;
@@ -73,10 +72,7 @@ import org.apache.cloudstack.api.command.user.guest.ListGuestOsCategoriesCmd;
 import org.apache.cloudstack.api.command.user.guest.ListGuestOsCmd;
 import org.apache.cloudstack.api.command.user.iso.ListIsosCmd;
 import org.apache.cloudstack.api.command.user.iso.UpdateIsoCmd;
-import org.apache.cloudstack.api.command.user.offering.ListDiskOfferingsCmd;
-import org.apache.cloudstack.api.command.user.offering.ListServiceOfferingsCmd;
 import org.apache.cloudstack.api.command.user.ssh.CreateSSHKeyPairCmd;
-import org.apache.cloudstack.api.command.user.ssh.ListSSHKeyPairsCmd;
 import org.apache.cloudstack.api.command.user.ssh.DeleteSSHKeyPairCmd;
 import org.apache.cloudstack.api.command.user.ssh.ListSSHKeyPairsCmd;
 import org.apache.cloudstack.api.command.user.ssh.RegisterSSHKeyPairCmd;
@@ -85,8 +81,9 @@ import org.apache.cloudstack.api.command.user.template.UpdateTemplateCmd;
 import org.apache.cloudstack.api.command.user.vm.GetVMPasswordCmd;
 import org.apache.cloudstack.api.command.user.vmgroup.UpdateVMGroupCmd;
 import org.apache.cloudstack.api.command.user.volume.ExtractVolumeCmd;
-import org.apache.cloudstack.api.command.user.zone.ListZonesByCmd;
 import org.apache.cloudstack.api.response.ExtractResponse;
+import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreManager;
+import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.log4j.Logger;
 
@@ -186,15 +183,22 @@ import com.cloud.storage.GuestOSCategoryVO;
 import com.cloud.storage.GuestOSVO;
 import com.cloud.storage.GuestOsCategory;
 import com.cloud.storage.Storage;
+import com.cloud.storage.VMTemplateVO;
 import com.cloud.storage.Storage.ImageFormat;
 import com.cloud.storage.StorageManager;
-import com.cloud.storage.StoragePoolVO;
+import com.cloud.storage.StoragePool;
 import com.cloud.storage.Upload;
 import com.cloud.storage.Upload.Mode;
 import com.cloud.storage.UploadVO;
-import com.cloud.storage.VMTemplateVO;
 import com.cloud.storage.Volume;
 import com.cloud.storage.VolumeVO;
+import com.cloud.storage.dao.DiskOfferingDao;
+import com.cloud.storage.dao.GuestOSCategoryDao;
+import com.cloud.storage.dao.GuestOSDao;
+import com.cloud.storage.dao.StoragePoolDao;
+import com.cloud.storage.dao.UploadDao;
+import com.cloud.storage.dao.VMTemplateDao;
+import com.cloud.storage.dao.VolumeDao;
 import com.cloud.storage.s3.S3Manager;
 import com.cloud.storage.secondary.SecondaryStorageVmManager;
 import com.cloud.storage.snapshot.SnapshotManager;
@@ -202,6 +206,7 @@ import com.cloud.storage.swift.SwiftManager;
 import com.cloud.storage.upload.UploadMonitor;
 import com.cloud.tags.ResourceTagVO;
 import com.cloud.tags.dao.ResourceTagDao;
+import com.cloud.template.TemplateManager;
 import com.cloud.template.VirtualMachineTemplate.TemplateFilter;
 import com.cloud.user.Account;
 import com.cloud.user.AccountManager;
@@ -242,7 +247,6 @@ import com.cloud.utils.net.MacAddress;
 import com.cloud.utils.net.NetUtils;
 import com.cloud.utils.ssh.SSHKeysHelper;
 import com.cloud.vm.ConsoleProxyVO;
-import com.cloud.vm.DomainRouterVO;
 import com.cloud.vm.InstanceGroupVO;
 import com.cloud.vm.SecondaryStorageVmVO;
 import com.cloud.vm.UserVmVO;
@@ -370,6 +374,10 @@ public class ManagementServerImpl extends ManagerBase implements ManagementServe
     SnapshotManager _snapshotMgr;
     @Inject
     HighAvailabilityManager _haMgr;
+    @Inject
+    TemplateManager templateMgr;
+    @Inject
+    DataStoreManager dataStoreMgr;
     @Inject
     HostTagsDao _hostTagsDao;
 
@@ -2298,8 +2306,8 @@ public class ManagementServerImpl extends ManagerBase implements ManagementServe
         }
 
         long accountId = volume.getAccountId();
-        StoragePoolVO srcPool = _poolDao.findById(volume.getPoolId());
-        HostVO sserver = _storageMgr.getSecondaryStorageHost(zoneId);
+        StoragePool srcPool = (StoragePool)this.dataStoreMgr.getPrimaryDataStore(volume.getPoolId());
+        HostVO sserver = this.templateMgr.getSecondaryStorageHost(zoneId);
         String secondaryStorageURL = sserver.getStorageUrl();
 
         List<UploadVO> extractURLList = _uploadDao.listByTypeUploadStatus(volumeId, Upload.Type.VOLUME, UploadVO.Status.DOWNLOAD_URL_CREATED);
@@ -2376,7 +2384,7 @@ public class ManagementServerImpl extends ManagerBase implements ManagementServe
         }
     }
 
-    private String getFormatForPool(StoragePoolVO pool) {
+    private String getFormatForPool(StoragePool pool) {
         ClusterVO cluster = ApiDBUtils.findClusterById(pool.getClusterId());
 
         if (cluster.getHypervisorType() == HypervisorType.XenServer) {

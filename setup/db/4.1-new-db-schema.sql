@@ -25,6 +25,13 @@ alter table storage_pool add scope varchar(255);
 alter table storage_pool modify id bigint unsigned AUTO_INCREMENT UNIQUE NOT NULL;
 alter table template_spool_ref add state varchar(255);
 alter table template_spool_ref add update_count bigint unsigned;
+alter table template_spool_ref add updated datetime;
+alter table template_host_ref add state varchar(255);
+alter table template_host_ref add update_count bigint unsigned;
+alter table template_host_ref add updated datetime;
+alter table volume_host_ref add state varchar(255);
+alter table volume_host_ref add update_count bigint unsigned;
+alter table volume_host_ref add updated datetime;
 alter table volumes add disk_type varchar(255);
 alter table volumes drop foreign key `fk_volumes__account_id`;
 alter table vm_instance add column disk_offering_id bigint unsigned;
@@ -54,15 +61,18 @@ alter table cluster add column lastUpdated datetime COMMENT 'last updated';
 alter table cluster add column engine_state varchar(32) NOT NULL DEFAULT 'Disabled' COMMENT 'the engine state of the zone';
 CREATE TABLE  `cloud`.`object_datastore_ref` (
   `id` bigint unsigned NOT NULL auto_increment,
-  `datastore_id` bigint unsigned NOT NULL,
+  `datastore_uuid`  varchar(255) NOT NULL,
   `datastore_role` varchar(255) NOT NULL,
-  `object_id` bigint unsigned NOT NULL,
+  `object_uuid` varchar(255) NOT NULL,
   `object_type` varchar(255) NOT NULL,
   `created` DATETIME NOT NULL,
   `last_updated` DATETIME,
   `job_id` varchar(255),
   `download_pct` int(10) unsigned,
   `download_state` varchar(255),
+  `url` varchar(255),
+  `format` varchar(255),
+  `checksum` varchar(255),
   `error_str` varchar(255),
   `local_path` varchar(255),
   `install_path` varchar(255),

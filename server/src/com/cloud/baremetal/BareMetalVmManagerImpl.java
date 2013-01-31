@@ -27,22 +27,12 @@ import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
-import org.apache.cloudstack.api.command.user.template.CreateTemplateCmd;
 import org.apache.cloudstack.api.command.user.vm.DeployVMCmd;
-import org.apache.cloudstack.api.command.user.vm.UpgradeVMCmd;
-import org.apache.cloudstack.api.command.user.volume.AttachVolumeCmd;
-import org.apache.cloudstack.api.command.user.volume.DetachVolumeCmd;
+import org.apache.cloudstack.api.command.user.vm.StartVMCmd;
 import org.apache.log4j.Logger;
 
-import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.StopAnswer;
-import com.cloud.agent.api.baremetal.IpmISetBootDevCommand;
-import com.cloud.agent.api.baremetal.IpmiBootorResetCommand;
 import com.cloud.agent.manager.Commands;
-import org.apache.cloudstack.api.command.user.vm.StartVMCmd;
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Component;
-
 import com.cloud.baremetal.PxeServerManager.PxeServerType;
 import com.cloud.configuration.Resource.ResourceType;
 import com.cloud.configuration.dao.ConfigurationDao;
@@ -70,24 +60,17 @@ import com.cloud.org.Grouping;
 import com.cloud.resource.ResourceManager;
 import com.cloud.service.ServiceOfferingVO;
 import com.cloud.storage.Storage;
-import com.cloud.storage.Storage.TemplateType;
-import com.cloud.storage.TemplateProfile;
 import com.cloud.storage.VMTemplateVO;
-import com.cloud.storage.Volume;
+import com.cloud.storage.Storage.TemplateType;
 import com.cloud.template.TemplateAdapter;
-import com.cloud.template.TemplateAdapter.TemplateAdapterType;
 import com.cloud.user.Account;
-import com.cloud.user.AccountVO;
 import com.cloud.user.SSHKeyPair;
-import com.cloud.user.User;
 import com.cloud.user.UserContext;
 import com.cloud.uservm.UserVm;
 import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.Pair;
-import com.cloud.utils.component.AdapterBase;
 import com.cloud.utils.component.Manager;
 import com.cloud.utils.concurrency.NamedThreadFactory;
-import com.cloud.utils.db.DB;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.fsm.StateListener;
 import com.cloud.utils.net.NetUtils;
@@ -118,7 +101,7 @@ public class BareMetalVmManagerImpl extends UserVmManagerImpl implements BareMet
     @PostConstruct
     public void init() {
     }
-    
+    /*
 	@Override
 	public boolean attachISOToVM(long vmId, long isoId, boolean attach) {
 		s_logger.warn("attachISOToVM is not supported by Bare Metal, just fake a true");
@@ -146,6 +129,7 @@ public class BareMetalVmManagerImpl extends UserVmManagerImpl implements BareMet
 	@Override
     public VMTemplateVO createPrivateTemplateRecord(CreateTemplateCmd cmd, Account templateOwner) throws ResourceAllocationException {
 		/*Baremetal creates record after host rebooting for imaging, in createPrivateTemplate*/
+    /*
 		return null;
 	}
 	
@@ -179,10 +163,12 @@ public class BareMetalVmManagerImpl extends UserVmManagerImpl implements BareMet
         }
 
         HostVO pxe = pxes.get(0);
+        */
         /*
          * prepare() will check if current account has right for creating
          * template
          */
+    /*
         TemplateAdapter adapter = AdapterBase.getAdapterByName(_adapters, TemplateAdapterType.BareMetal.getName());
         Long userId = UserContext.current().getCallerUserId();
         userId = (userId == null ? User.UID_SYSTEM : userId);
@@ -217,6 +203,7 @@ public class BareMetalVmManagerImpl extends UserVmManagerImpl implements BareMet
             throw new CloudRuntimeException(e.getMessage());
         }
 	}
+	*/
 
 	@Override
 	public UserVm createVirtualMachine(DeployVMCmd cmd) throws InsufficientCapacityException, ResourceUnavailableException, ConcurrentOperationException,

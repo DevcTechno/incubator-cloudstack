@@ -36,8 +36,8 @@ import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreManager;
 import org.apache.log4j.Logger;
-import org.springframework.stereotype.Component;
 
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.AgentManager.OnError;
@@ -121,10 +121,10 @@ import com.cloud.storage.DiskOfferingVO;
 import com.cloud.storage.Storage.ImageFormat;
 import com.cloud.storage.StorageManager;
 import com.cloud.storage.StoragePool;
-import com.cloud.storage.StoragePoolVO;
 import com.cloud.storage.VMTemplateVO;
 import com.cloud.storage.Volume;
 import com.cloud.storage.Volume.Type;
+import com.cloud.storage.VolumeManager;
 import com.cloud.storage.VolumeVO;
 import com.cloud.storage.dao.GuestOSCategoryDao;
 import com.cloud.storage.dao.GuestOSDao;
@@ -165,6 +165,8 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
 
     @Inject
     protected StorageManager _storageMgr;
+    @Inject
+    DataStoreManager dataStoreMgr;
     @Inject
     protected NetworkManager _networkMgr;
     @Inject
@@ -239,6 +241,8 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
 
     @Inject
     protected ConfigurationDao _configDao;
+    @Inject
+    VolumeManager volumeMgr;
 
     Map<VirtualMachine.Type, VirtualMachineGuru<? extends VMInstanceVO>> _vmGurus = new HashMap<VirtualMachine.Type, VirtualMachineGuru<? extends VMInstanceVO>>();
     protected StateMachine2<State, VirtualMachine.Event, VirtualMachine> _stateMachine;
@@ -305,15 +309,15 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
         }
 
         if (template.getFormat() == ImageFormat.ISO) {
-            _storageMgr.allocateRawVolume(Type.ROOT, "ROOT-" + vm.getId(), rootDiskOffering.first(), rootDiskOffering.second(), vm, owner);
+            this.volumeMgr.allocateRawVolume(Type.ROOT, "ROOT-" + vm.getId(), rootDiskOffering.first(), rootDiskOffering.second(), vm, owner);
         } else if (template.getFormat() == ImageFormat.BAREMETAL) {
             // Do nothing
         } else {
-            _storageMgr.allocateTemplatedVolume(Type.ROOT, "ROOT-" + vm.getId(), rootDiskOffering.first(), template, vm, owner);
+            this.volumeMgr.allocateTemplatedVolume(Type.ROOT, "ROOT-" + vm.getId(), rootDiskOffering.first(), template, vm, owner);
         }
 
         for (Pair<DiskOfferingVO, Long> offering : dataDiskOfferings) {
-            _storageMgr.allocateRawVolume(Type.DATADISK, "DATA-" + vm.getId(), offering.first(), offering.second(), vm, owner);
+            this.volumeMgr.allocateRawVolume(Type.DATADISK, "DATA-" + vm.getId(), offering.first(), offering.second(), vm, owner);
         }
 
         txn.commit();
@@ -401,7 +405,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
         s_logger.debug("Cleaning up NICS");
         _networkMgr.cleanupNics(profile);
         // Clean up volumes based on the vm's instance id
-        _storageMgr.cleanupVolumes(vm.getId());
+        this.volumeMgr.cleanupVolumes(vm.getId());
 
         VirtualMachineGuru<T> guru = getVmGuru(vm);
         guru.finalizeExpunge(vm);
@@ -668,7 +672,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
                             continue;
                         }
 
-                        StoragePoolVO pool = _storagePoolDao.findById(vol.getPoolId());
+                        StoragePool pool = (StoragePool)dataStoreMgr.getPrimaryDataStore(vol.getPoolId());
                         if (!pool.isInMaintenance()) {
                             if (s_logger.isDebugEnabled()) {
                                 s_logger.debug("Root volume is ready, need to place VM in volume's cluster");
@@ -745,7 +749,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
                     }
                     _networkMgr.prepare(vmProfile, dest, ctx); 
                     if (vm.getHypervisorType() != HypervisorType.BareMetal) {
-                        _storageMgr.prepare(vmProfile, dest);
+                        this.volumeMgr.prepare(vmProfile, dest);
                     }
                     //since StorageMgr succeeded in volume creation, reuse Volume for further tries until current cluster has capacity
                     if(!reuseVolume){
@@ -960,7 +964,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
             s_logger.warn("Unable to release some network resources.", e);
         }
 
-        _storageMgr.release(profile);
+        this.volumeMgr.release(profile);
         s_logger.debug("Successfully cleanued up resources for the vm " + vm + " in " + state + " state");
         return true;
     }
@@ -1109,7 +1113,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
 
         try {
             if (vm.getHypervisorType() != HypervisorType.BareMetal) {
-                _storageMgr.release(profile);
+                this.volumeMgr.release(profile);
                 s_logger.debug("Successfully released storage resources for the vm " + vm);
             }
         } catch (Exception e) {
@@ -1217,7 +1221,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
         VirtualMachineProfile<VMInstanceVO> profile = new VirtualMachineProfileImpl<VMInstanceVO>(vm);
         boolean migrationResult = false;
         try {
-            migrationResult = _storageMgr.StorageMigration(profile, destPool);
+            migrationResult = this.volumeMgr.StorageMigration(profile, destPool);
 
             if (migrationResult) {
                 //if the vm is migrated to different pod in basic mode, need to reallocate ip
@@ -1302,7 +1306,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
 
         VirtualMachineProfile<VMInstanceVO> profile = new VirtualMachineProfileImpl<VMInstanceVO>(vm);
         _networkMgr.prepareNicForMigration(profile, dest);
-        _storageMgr.prepareForMigration(profile, dest);
+        this.volumeMgr.prepareForMigration(profile, dest);
 
         VirtualMachineTO to = toVmTO(profile);
         PrepareForMigrationCommand pfmc = new PrepareForMigrationCommand(to);

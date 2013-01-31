@@ -45,7 +45,7 @@ import org.apache.cloudstack.api.response.UserResponse;
 import org.apache.cloudstack.api.response.UserVmResponse;
 import org.apache.cloudstack.api.response.VolumeResponse;
 import org.apache.cloudstack.api.response.ZoneResponse;
-
+import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
 import org.springframework.stereotype.Component;
 
 import com.cloud.api.query.dao.AccountJoinDao;
@@ -205,7 +205,6 @@ import com.cloud.storage.SnapshotVO;
 import com.cloud.storage.Storage.ImageFormat;
 import com.cloud.storage.StorageManager;
 import com.cloud.storage.StoragePool;
-import com.cloud.storage.StoragePoolVO;
 import com.cloud.storage.StorageStats;
 import com.cloud.storage.UploadVO;
 import com.cloud.storage.VMTemplateHostVO;
@@ -215,6 +214,7 @@ import com.cloud.storage.VMTemplateVO;
 import com.cloud.storage.Volume;
 import com.cloud.storage.Volume.Type;
 import com.cloud.storage.VolumeHostVO;
+import com.cloud.storage.VolumeManager;
 import com.cloud.storage.VolumeVO;
 import com.cloud.storage.dao.DiskOfferingDao;
 import com.cloud.storage.dao.GuestOSCategoryDao;
@@ -231,6 +231,7 @@ import com.cloud.storage.dao.VMTemplateSwiftDao;
 import com.cloud.storage.dao.VolumeDao;
 import com.cloud.storage.dao.VolumeHostDao;
 import com.cloud.storage.snapshot.SnapshotPolicy;
+import com.cloud.template.TemplateManager;
 import com.cloud.user.Account;
 import com.cloud.user.AccountDetailsDao;
 import com.cloud.user.AccountVO;
@@ -270,9 +271,12 @@ public class ApiDBUtils {
     static AsyncJobManager _asyncMgr;
     static SecurityGroupManager _securityGroupMgr;
     static StorageManager _storageMgr;
+    static VolumeManager _volumeMgr;
     static UserVmManager _userVmMgr;
     static NetworkModel _networkModel;
     static NetworkManager _networkMgr;
+    static TemplateManager _templateMgr;
+    
     static StatsCollector _statsCollector;
 
     static AccountDao _accountDao;
@@ -371,6 +375,8 @@ public class ApiDBUtils {
     @Inject private NetworkModel networkModel;
     @Inject private NetworkManager networkMgr;
     @Inject private StatsCollector statsCollector;
+    @Inject private TemplateManager templateMgr;
+    @Inject private VolumeManager volumeMgr;
 
     @Inject private AccountDao accountDao;
     @Inject private AccountVlanMapDao accountVlanMapDao;
@@ -470,6 +476,7 @@ public class ApiDBUtils {
         _networkModel = networkModel;
         _networkMgr = networkMgr;
         _configMgr = configMgr;
+        _templateMgr = templateMgr;
 
         _accountDao = accountDao;
         _accountVlanMapDao = accountVlanMapDao;
@@ -832,7 +839,7 @@ public class ApiDBUtils {
             List<VMTemplateHostVO> res = _templateHostDao.listByTemplateId(templateId);
             return res.size() == 0 ? null : res.get(0);
         } else {
-            return _storageMgr.getTemplateHostRef(zoneId, templateId, readyOnly);
+            return _templateMgr.getTemplateHostRef(zoneId, templateId, readyOnly);
         }
     }
 
@@ -934,7 +941,7 @@ public class ApiDBUtils {
             throw new InvalidParameterValueException("Please specify a valid volume ID.");
         }
 
-        return _storageMgr.volumeOnSharedStoragePool(volume);
+        return _volumeMgr.volumeOnSharedStoragePool(volume);
     }
 
     public static List<NicProfile> getNics(VirtualMachine vm) {
