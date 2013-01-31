@@ -34,6 +34,7 @@ import org.apache.cloudstack.api.command.user.template.RegisterTemplateCmd;
 import org.apache.cloudstack.engine.subsystem.api.storage.CommandResult;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStore;
 import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreManager;
+import org.apache.cloudstack.engine.subsystem.api.storage.DataStoreRole;
 import org.apache.cloudstack.engine.subsystem.api.storage.ImageDataFactory;
 import org.apache.cloudstack.engine.subsystem.api.storage.ImageService;
 import org.apache.cloudstack.framework.async.AsyncCallFuture;
@@ -54,8 +55,8 @@ import com.cloud.storage.Storage.ImageFormat;
 import com.cloud.storage.Storage.TemplateType;
 import com.cloud.storage.TemplateProfile;
 import com.cloud.storage.VMTemplateHostVO;
-import com.cloud.storage.VMTemplateVO;
 import com.cloud.storage.VMTemplateStorageResourceAssoc.Status;
+import com.cloud.storage.VMTemplateVO;
 import com.cloud.storage.VMTemplateZoneVO;
 import com.cloud.storage.download.DownloadMonitor;
 import com.cloud.storage.secondary.SecondaryStorageVmManager;
@@ -73,7 +74,7 @@ public class HyervisorTemplateAdapter extends TemplateAdapterBase implements Tem
 	@Inject DataStoreManager storeMgr;
 	@Inject ImageService imageService;
 	@Inject ImageDataFactory imageFactory;
-	@Inject TemplateManager templateMgr;
+
 	
 	private String validateUrl(String url) {
 		try {
@@ -154,7 +155,7 @@ public class HyervisorTemplateAdapter extends TemplateAdapterBase implements Tem
 			throw new CloudRuntimeException("Unable to persist the template " + profile.getTemplate());
 		}
 		
-		DataStore imageStore = this.templateMgr.getImageStore(profile.getImageStoreUuid(), profile.getZoneId());
+		DataStore imageStore = this.storeMgr.getDataStore(profile.getImageStoreId(), DataStoreRole.Image);
 		
 		AsyncCallFuture<CommandResult> future = this.imageService.createTemplateAsync(this.imageFactory.getTemplate(template.getId()), imageStore);
 		try {
